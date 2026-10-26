@@ -1,0 +1,9 @@
+target/
+node_modules/
+dist/
+# Live key material from the end-to-end runs. This is money.
+.zeryth/
+*.secret.json
+*.tsbuildinfo
+.vercel/
+.DS_Store

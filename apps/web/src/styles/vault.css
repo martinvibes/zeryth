@@ -1,0 +1,371 @@
+.vault {
+  min-height: 100svh;
+  padding: clamp(6rem, 12vh, 8rem) 0 5rem;
+  background:
+    radial-gradient(60% 30% at 90% 0%, rgba(255, 206, 110, 0.22), transparent 70%),
+    linear-gradient(180deg, #dbe8f3, var(--frost) 30%);
+}
+.vault-empty {
+  min-height: 100svh;
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: 1.2rem;
+}
+.vault-empty h1 {
+  font-size: var(--t-h2);
+}
+
+.vault-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+.vault-head h1 {
+  font-size: clamp(2.4rem, 1.4rem + 4vw, 4.4rem);
+  font-variation-settings: "wdth" 114;
+  letter-spacing: -0.035em;
+  line-height: 0.98;
+  margin-top: 0.3rem;
+}
+.vault-head .lead {
+  margin-top: 0.6rem;
+}
+.vault-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.vault-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+.vault-grid > * {
+  grid-column: 1 / -1;
+}
+.vault-share {
+  grid-column: 1 / span 8;
+}
+.vault-status {
+  grid-column: 9 / -1;
+}
+@media (max-width: 899px) {
+  .vault-share,
+  .vault-status {
+    grid-column: 1 / -1;
+  }
+}
+
+.vault-h2 {
+  font-size: clamp(1.3rem, 1.1rem + 0.8vw, 1.7rem);
+  font-variation-settings: "wdth" 110;
+}
+
+.vault-share,
+.vault-status,
+.vault-burned,
+.cards-panel {
+  display: grid;
+  gap: 0.9rem;
+  padding: 1.4rem 1.5rem;
+}
+.vault-share-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1rem;
+  align-items: center;
+}
+.vault-share-side {
+  display: grid;
+  gap: 0.5rem;
+  justify-items: start;
+  min-width: 0;
+}
+.vault-share-side .copyfield {
+  width: 100%;
+}
+.vault-status {
+  align-content: start;
+  justify-items: start;
+  height: 100%;
+}
+.vault-stats {
+  margin: 0;
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+.vault-stats div {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.6);
+  box-shadow: inset 0 0 0 1px var(--line);
+  min-width: 0;
+}
+.vault-stats dt {
+  font-size: 0.78rem;
+  color: var(--slate);
+}
+.vault-stats dd {
+  margin: 0;
+  font-weight: 760;
+  font-size: 1.05rem;
+  font-variation-settings: "wdth" 106;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.vault-status-row {
+  display: flex;
+  gap: 0.6rem;
+  align-items: baseline;
+}
+.vault-status-row .dot {
+  transform: translateY(-1px);
+}
+
+/* Rounds */
+.round {
+  display: grid;
+  gap: 1.1rem;
+  padding: 1.5rem;
+}
+.round-open {
+  box-shadow:
+    var(--panel-edge),
+    inset 0 0 0 2px rgba(30, 122, 98, 0.25),
+    var(--panel-shadow);
+}
+.round-closing {
+  box-shadow:
+    var(--panel-edge),
+    inset 0 0 0 2px rgba(246, 182, 55, 0.45),
+    var(--panel-shadow);
+}
+.round-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.round-balance {
+  display: grid;
+  justify-items: end;
+}
+.round-balance-value {
+  font-size: clamp(1.5rem, 1.2rem + 1.2vw, 2.1rem);
+  font-weight: 780;
+  font-variation-settings: "wdth" 108;
+  letter-spacing: -0.02em;
+}
+.round-empty {
+  padding: 1.4rem;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.5);
+  box-shadow: inset 0 0 0 1px var(--line);
+  text-align: center;
+}
+.gifts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+.gift {
+  display: grid;
+  grid-template-columns: 13.5rem minmax(0, 1fr) auto;
+  gap: 0.9rem;
+  align-items: center;
+  padding: 0.7rem 0.8rem;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.6);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.gift .pill {
+  justify-self: start;
+}
+.gift-what {
+  font-weight: 560;
+  min-width: 0;
+}
+@media (max-width: 720px) {
+  .gift {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .gift .pill {
+    grid-column: 1 / -1;
+  }
+}
+.round-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--line);
+}
+.round-foot p {
+  max-width: 34em;
+}
+.round-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* Burned */
+.vault-burned ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+.vault-burned li {
+  display: grid;
+  grid-template-columns: 6rem minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: baseline;
+  padding: 0.7rem 0;
+  border-top: 1px dashed var(--line-strong);
+}
+.burned-name {
+  font-weight: 700;
+  color: var(--slate);
+  text-decoration: line-through;
+  text-decoration-color: rgba(200, 55, 79, 0.6);
+}
+
+/* Payout plan */
+.plan {
+  display: grid;
+  gap: 0.9rem;
+  margin: 0;
+}
+.plan > div {
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.8rem 1rem;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.plan dt {
+  font-size: var(--t-small);
+  font-weight: 600;
+  color: var(--slate);
+}
+.plan dd {
+  margin: 0;
+  font-weight: 700;
+}
+.plan-big {
+  font-size: 1.8rem;
+  font-variation-settings: "wdth" 110;
+  color: var(--ink);
+}
+.plan-warn {
+  padding: 0.8rem 1rem;
+  border-radius: 14px;
+  background: rgba(200, 55, 79, 0.08);
+  color: #8f2236;
+  font-weight: 560;
+}
+
+/* Cards */
+.cards-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.cards-panel-head p {
+  max-width: 36em;
+  margin-top: 0.3rem;
+}
+.newbatch {
+  display: grid;
+  gap: 1rem;
+  padding: 1.1rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.newbatch-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.8rem;
+}
+.batches {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.8rem;
+}
+.batch {
+  display: grid;
+  gap: 0.9rem;
+  padding: 1.1rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.6);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.batch-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.batch-fund {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+.batch-fund-side {
+  display: grid;
+  gap: 0.6rem;
+  justify-items: start;
+  min-width: 0;
+}
+.batch-fund-side .copyfield {
+  width: 100%;
+}
+.batch-done {
+  display: grid;
+  gap: 0.6rem;
+}
+.batch-done .sheet-actions {
+  justify-content: flex-start;
+}
+@media (max-width: 560px) {
+  .batch-fund,
+  .vault-share-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.vault-danger {
+  padding: 0.5rem 0.2rem;
+}
+.vault-danger summary {
+  cursor: pointer;
+  color: var(--slate);
+}
+.vault-danger details[open] {
+  display: grid;
+  gap: 0.7rem;
+  justify-items: start;
+}

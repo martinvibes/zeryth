@@ -1,0 +1,370 @@
+@font-face {
+  font-family: "Mona Sans";
+  src: url("../assets/fonts/mona-sans.woff2") format("woff2-variations");
+  font-weight: 200 900;
+  font-stretch: 75% 125%;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
+    U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Mona Sans";
+  src: url("../assets/fonts/mona-sans-ext.woff2") format("woff2-variations");
+  font-weight: 200 900;
+  font-stretch: 75% 125%;
+  font-display: swap;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F, U+20A0-20AB,
+    U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+:root {
+  /* Winter morning: frost and glacier, navy ink, and gold for money and light. */
+  --frost: #f2f6fa;
+  --ice: #e7eff7;
+  --glacier: #d9e6f2;
+  --sky: #c9dcee;
+  --ink: #0f2340;
+  --ink-2: #1c3456;
+  --slate: #5a6b85;
+  --mist: #8a99af;
+  --sun: #f6b637;
+  --sun-deep: #a86b00;
+  --blush: #ff9db5;
+  --pine: #1e7a62;
+  --alarm: #c8374f;
+  --line: rgba(15, 35, 64, 0.11);
+  --line-strong: rgba(15, 35, 64, 0.2);
+
+  --r-pill: 999px;
+  --r-panel: 28px;
+  --r-card: 18px;
+  --r-chip: 12px;
+
+  --font: "Mona Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* A modular scale on 1.25, anchored at 17px body. */
+  --t-small: 0.875rem;
+  --t-body: 1.0625rem;
+  --t-lead: clamp(1.15rem, 1.05rem + 0.45vw, 1.4rem);
+  --t-h3: clamp(1.3rem, 1.15rem + 0.6vw, 1.66rem);
+  --t-h2: clamp(2rem, 1.4rem + 2.6vw, 3.6rem);
+  --t-hero: clamp(3.1rem, 0.6rem + 7.4vw, 8.4rem);
+
+  --gutter: clamp(1rem, 0.5rem + 2.5vw, 3rem);
+  --max: 1320px;
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  --panel-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(240, 246, 251, 0.74));
+  --panel-edge: inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 0 0 1px rgba(255, 255, 255, 0.55);
+  --panel-shadow: 0 1px 2px rgba(15, 35, 64, 0.06), 0 24px 48px -28px rgba(15, 35, 64, 0.32);
+
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+body {
+  margin: 0;
+  background: var(--frost);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: var(--t-body);
+  line-height: 1.55;
+  font-variation-settings: "wdth" 100;
+  font-feature-settings: "ss01", "cv11";
+  overflow-x: hidden;
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+  margin: 0;
+}
+
+h1,
+h2,
+h3 {
+  font-weight: 760;
+  line-height: 1.02;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+
+h2 {
+  font-size: var(--t-h2);
+  font-variation-settings: "wdth" 118;
+}
+
+h3 {
+  font-size: var(--t-h3);
+  font-variation-settings: "wdth" 110;
+  letter-spacing: -0.015em;
+  line-height: 1.12;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+a {
+  color: inherit;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+::selection {
+  background: var(--sun);
+  color: var(--ink);
+}
+
+:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+/* Mona Sans draws its tabular figures with a slashed zero, which reads as code.
+   Amounts keep the proportional figures and never break across lines. */
+.num {
+  font-variant-numeric: lining-nums proportional-nums;
+  white-space: nowrap;
+}
+
+.wrap {
+  width: 100%;
+  max-width: var(--max);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+.lead {
+  font-size: var(--t-lead);
+  line-height: 1.45;
+  color: var(--ink-2);
+  max-width: 34em;
+}
+
+.muted {
+  color: var(--slate);
+}
+
+.small {
+  font-size: var(--t-small);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Buttons                                                                 */
+/* ---------------------------------------------------------------------- */
+
+.btn {
+  --bg: var(--ink);
+  --fg: var(--frost);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6em;
+  min-height: 3.25rem;
+  padding: 0 1.6rem;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--bg);
+  color: var(--fg);
+  font-weight: 640;
+  font-variation-settings: "wdth" 108;
+  letter-spacing: -0.005em;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 0.35s var(--ease-spring), box-shadow 0.35s var(--ease-out), background 0.25s;
+  box-shadow: 0 10px 24px -12px rgba(15, 35, 64, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  white-space: nowrap;
+}
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 30px -14px rgba(15, 35, 64, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+.btn:active {
+  transform: translateY(1px) scale(0.985);
+}
+.btn[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+.btn.gold {
+  --bg: var(--sun);
+  --fg: var(--ink);
+  box-shadow: 0 12px 28px -12px rgba(168, 107, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+.btn.ghost {
+  --bg: rgba(255, 255, 255, 0.6);
+  --fg: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+.btn.ghost:hover {
+  --bg: #fff;
+}
+.btn.small {
+  min-height: 2.5rem;
+  padding: 0 1.1rem;
+  font-size: var(--t-small);
+}
+.btn.block {
+  width: 100%;
+}
+
+.linkish {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 0.25em;
+  cursor: pointer;
+}
+.linkish:hover {
+  text-decoration-color: var(--ink);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Panels: sheets of ice                                                   */
+/* ---------------------------------------------------------------------- */
+
+.panel {
+  position: relative;
+  border-radius: var(--r-panel);
+  background: var(--panel-bg);
+  box-shadow: var(--panel-edge), var(--panel-shadow);
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+}
+
+.field {
+  display: grid;
+  gap: 0.45rem;
+}
+.field > span {
+  font-size: var(--t-small);
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.field small {
+  color: var(--slate);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+.input {
+  width: 100%;
+  min-height: 3.25rem;
+  padding: 0.75rem 1rem;
+  border-radius: 14px;
+  border: 1px solid var(--line-strong);
+  background: rgba(255, 255, 255, 0.82);
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.input:focus {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 4px rgba(246, 182, 55, 0.35);
+}
+.input.mono-ish {
+  font-variation-settings: "wdth" 82;
+  letter-spacing: 0.01em;
+  word-break: break-all;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: inset 0 0 0 1px var(--line);
+  font-size: 0.8125rem;
+  font-weight: 560;
+  white-space: nowrap;
+}
+.dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--mist);
+  flex: none;
+}
+.dot.live {
+  background: var(--pine);
+  box-shadow: 0 0 0 0 rgba(30, 122, 98, 0.45);
+  animation: pulse 2.2s infinite;
+}
+.dot.gold {
+  background: var(--sun);
+}
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(30, 122, 98, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 9px rgba(30, 122, 98, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(30, 122, 98, 0);
+  }
+}
+
+.err {
+  padding: 0.85rem 1rem;
+  border-radius: 14px;
+  background: rgba(200, 55, 79, 0.08);
+  color: var(--alarm);
+  font-size: var(--t-small);
+  line-height: 1.45;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

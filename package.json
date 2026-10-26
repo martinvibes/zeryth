@@ -1,0 +1,19 @@
+{
+  "name": "zeryth",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:engine": "wasm-pack build crates/engine --target web --release --scope zeryth --out-dir ../../packages/engine-wasm --out-name engine && rm -f packages/engine-wasm/.gitignore",
+    "typecheck": "tsc -p packages/core --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "@zeryth/core": "workspace:*",
+    "@zeryth/zeryth-engine": "workspace:*"
+  },
+  "packageManager": "pnpm@10.34.5"
+}

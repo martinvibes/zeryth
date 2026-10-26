@@ -1,0 +1,7 @@
+target
+node_modules
+apps/web/dist
+.zeryth
+*.secret.json
+*.tsbuildinfo
+memory.md

@@ -1,0 +1,126 @@
+[package]
+name = "zeryth-engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Zeryth engine: one-time Ironwood keys, scanning, sweeping and round payouts. Adapted from Zenvelope core (MIT, Ihor Muliar)."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = []
+# M4: threaded proving. Turns on `orchard/multicore`, which is what puts rayon inside
+# halo2's MSM and FFT, and links wasm-bindgen-rayon so the browser can hand that rayon a
+# real thread pool. It is a *build* feature, not a runtime one: a module built with it
+# imports a shared memory and only instantiates on a cross-origin-isolated page, so the
+# app ships both packages (web/src/wasm/core and web/src/wasm/core-mt) and picks between
+# them at load time. See scripts/build-core.sh.
+multicore = ["orchard/multicore", "dep:rayon", "dep:wasm-bindgen-rayon"]
+
+[dependencies]
+# `unstable-frost` is on only for `UnifiedFullViewingKey::from_orchard_fvk`, which is
+# how the viewing key is kept to a single Orchard item; nothing FROST-related is used.
+zcash_keys = { version = "0.17.0", default-features = false, features = ["orchard", "unstable-frost"] }
+zcash_protocol = "0.11.0"
+zcash_address = "0.14.0"
+zip32 = "0.3"
+zip321 = "0.10.0"
+base64 = "0.22"
+getrandom = "0.3"
+wasm-bindgen = "0.2"
+js-sys = "0.3"
+
+# M2: sync and trial decryption.
+#
+# `zcash_client_backend` is taken with default features off: `orchard` brings in the
+# Orchard/Ironwood note types and the compact-block scanning helpers, and
+# `lightwalletd-tonic` brings in the generated `CompactTxStreamer` client without the
+# native `tonic` transport (a browser has no sockets; the transport is gRPC-web).
+zcash_client_backend = { version = "0.25.0", default-features = false, features = ["orchard", "lightwalletd-tonic"] }
+# M3: building, proving and broadcasting the sweep.
+#
+# `circuits` is what makes `Builder::build` exist at all, and it is also what pulls the
+# Orchard/Ironwood halo2 circuit into the wasm. `std` is what gives that build path the
+# process-wide `cached_orchard_proving_key` OnceLock that `warm_proving_key` primes.
+# `multicore` is off unless this crate's own `multicore` feature is on, which is the
+# threaded build: a plain `--target web` build has no threads to give rayon.
+# `circuits` also turns on `sapling/circuit`, which is why `sapling-crypto` is a
+# direct dependency below: the `SpendProver`/`OutputProver` traits live there and `build`
+# demands a prover for each, even when no Sapling bundle is ever constructed.
+zcash_primitives = { version = "0.31.0", default-features = false, features = ["circuits", "std"] }
+zcash_note_encryption = "0.5.1"
+orchard = { version = "0.16.0", default-features = false, features = ["circuit"] }
+sapling-crypto = { version = "0.9", default-features = false, features = ["circuit"] }
+# Named only to spell out `NoSaplingProver`'s signatures; no arithmetic happens here.
+jubjub = { version = "0.11", default-features = false }
+bls12_381 = { version = "0.9", default-features = false }
+rand_core = { version = "0.10", default-features = false }
+transparent = { package = "zcash_transparent", version = "0.11.0", default-features = false }
+incrementalmerkletree = "0.9"
+rand = { version = "0.10", default-features = false, features = ["std", "sys_rng"] }
+bip0039 = { version = "0.14", default-features = false, features = ["std"] }
+hex = "0.4"
+tonic = { version = "0.14", default-features = false, features = ["codegen"] }
+futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
+
+# The browser CSPRNG. getrandom 0.3 reaches `crypto.getRandomValues` only when the
+# `wasm_js` feature is on AND the matching backend cfg is set; the cfg lives in
+# .cargo/config.toml so every build gets it, not just the ones that remember a flag.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.3", features = ["wasm_js"] }
+# rand 0.10's SysRng sits on getrandom 0.4, which takes its browser backend from this feature.
+getrandom_04 = { package = "getrandom", version = "0.4", features = ["wasm_js"] }
+
+# The *other* getrandom. The Orchard circuit tree reaches randomness through rand 0.8,
+# which is on getrandom 0.2, and getrandom 0.2 refuses to build for
+# wasm32-unknown-unknown unless the `js` backend is named as a feature. The 0.3 above
+# takes its backend from the cfg in .cargo/config.toml; this one takes it from here.
+# Both are in the tree and neither covers the other.
+getrandom_02 = { package = "getrandom", version = "0.2", features = ["js"] }
+
+# gRPC-web over `fetch`. Browser-only by construction: it builds on web-sys, so it is
+# scoped to the wasm target and the module that uses it is `cfg`-gated to match.
+tonic-web-wasm-client = "0.9"
+wasm-bindgen-futures = "0.4"
+# `crate::gateway` rebuilds a request so it can be re-sent to the other gateway, which
+# means holding its body (`Full`) and reading the original one (`BodyExt::collect`).
+# Both are already in the tree under `tonic`; naming them here only makes them reachable.
+http-body-util = "0.1"
+
+# M4, `multicore` only. `no-bundler` because the threaded package is served as plain
+# files and loaded by URL from the core worker rather than put through Vite's module
+# graph: the bundler glue resolves the main module as `import("../../..")`, which only a
+# bundler holding the package in its graph can answer.
+rayon = { version = "1.8", optional = true }
+wasm-bindgen-rayon = { version = "1.3.0", features = ["no-bundler"], optional = true }
+
+# The native M3 integration test (tests/m3_sweep.rs, `#[ignore]`d) talks plain gRPC to a
+# mainnet lightwalletd, which a browser cannot do and the shipped wasm must not carry.
+# Dev dependencies are not part of a `wasm-pack build`, so the native transport and its
+# TLS stack stay out of the browser bundle.
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+tonic = { version = "0.14", default-features = false, features = ["transport", "tls-webpki-roots", "tls-ring", "codegen"] }
+zcash_client_backend = { version = "0.25.0", default-features = false, features = [
+    "orchard",
+    "lightwalletd-tonic",
+    "lightwalletd-tonic-transport",
+    "lightwalletd-tonic-tls-webpki-roots",
+] }
+
+# rustc emits post-MVP wasm (bulk memory, sign extension, and friends) by default, and
+# the wasm-opt build wasm-pack ships with rejects those unless each one is named.
+[package.metadata.wasm-pack.profile.release]
+# `--enable-threads` is named for the `multicore` build; on the single-threaded build it
+# permits a feature the module never uses, which costs nothing.
+wasm-opt = [
+    "-Oz",
+    "--enable-threads",
+    "--enable-bulk-memory",
+    "--enable-sign-ext",
+    "--enable-mutable-globals",
+    "--enable-nontrapping-float-to-int",
+    "--enable-reference-types",
+    "--enable-multivalue",
+]
