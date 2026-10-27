@@ -31,9 +31,18 @@ export function ago(unixSeconds: number): string {
 export function until(iso: string): string {
   const ms = Date.parse(iso) - Date.now();
   if (ms <= 0) return "expired";
-  const m = Math.floor(ms / 60000);
-  const s = Math.floor((ms % 60000) / 1000);
-  return m >= 1 ? `${m}:${String(s).padStart(2, "0")}` : `0:${String(s).padStart(2, "0")}`;
+  const total = Math.floor(ms / 1000);
+  const d = Math.floor(total / 86400);
+  const h = Math.floor(total / 3600);
+  if (d >= 1) {
+    const days = d === 1 ? "a day" : `${d} days`;
+    const hours = h % 24;
+    return hours ? `${days} and ${hours} ${hours === 1 ? "hour" : "hours"}` : days;
+  }
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const m = Math.floor(total / 60) % 60;
+  const s = total % 60;
+  return h >= 1 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
 }
 
 export async function copy(text: string): Promise<boolean> {

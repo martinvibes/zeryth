@@ -123,6 +123,23 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.vault-step {
+  width: 100%;
+}
+.vault-step > label {
+  font-size: var(--t-small);
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.vault-step-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.vault-step-row .input {
+  flex: 1;
+  min-width: 0;
+}
 .vault-status-row {
   display: flex;
   gap: 0.6rem;

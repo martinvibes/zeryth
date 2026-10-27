@@ -10,8 +10,9 @@
  *   open ──close──> closing ──every donation settled──> payout ──> burned
  *
  * - **open**: its drop key is the one in the group's notice; donors are paying into it.
- * - **closing**: a newer round has replaced it in the notice, but quotes issued while it
- *   was open can still land until their deadlines pass.
+ * - **closing**: a newer round has replaced it in the notice, but gifts already paid for
+ *   can still land. A quote nobody has paid can stay valid for days, so it doesn't hold
+ *   the round up: at payout its key moves to the open round.
  * - **payout**: one transaction sends a round number of ZEC to the vault and carries the
  *   rest into the open round's key.
  * - **burned**: the round secret and every donation key it collected are deleted. The
@@ -172,7 +173,8 @@ export async function readBoard(state: VaultState): Promise<DonationRecord[]> {
     // A little slack before the round opened: clocks disagree.
     const drops: Drop[] = await fetchDrops(keys.dropSecret, round.openedAt - 600);
     for (const drop of drops) {
-      if (round.donations.some((d) => d.dropId === drop.eventId)) continue;
+      // A drop can sit in a later round: payout moves unpaid quotes forward.
+      if (state.rounds.some((r) => r.donations.some((d) => d.dropId === drop.eventId))) continue;
       const p = drop.payload;
       const record: DonationRecord = {
         dropId: drop.eventId,
@@ -250,9 +252,12 @@ export async function sweepDonation(
   return outcome.txid;
 }
 
-/** True when nothing more can arrive for this round's donors. */
+/**
+ * True when no gift is mid-swap or waiting to be collected. Quotes nobody has paid don't
+ * count: payout moves them to the open round.
+ */
 export function settled(round: Round): boolean {
-  return round.donations.every((d) => ["swept", "refunded", "expired", "failed"].includes(d.status));
+  return round.donations.every((d) => ["awaiting", "swept", "refunded", "expired", "failed"].includes(d.status));
 }
 
 /**
@@ -268,6 +273,11 @@ export async function payout(
 ): Promise<Round["payout"]> {
   const next = openRound(state);
   if (!next || next === round) throw new Error("open a new round first: the carry needs somewhere to go");
+
+  // The open round keeps the keys of quotes nobody has paid yet, so a late payment is
+  // still collected after this round burns.
+  next.donations.push(...round.donations.filter((d) => d.status === "awaiting"));
+  round.donations = round.donations.filter((d) => d.status !== "awaiting");
 
   const opened = await engine.open({ secret: round.zcashSecret, birthday: round.birthday });
   const notes = opened.notes.filter((n) => !n.spent);

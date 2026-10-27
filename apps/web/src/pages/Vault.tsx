@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "motion/react";
 import {
   burn,
   openRound,
+  parseZec,
   payout,
   planPayout,
   readBoard,
@@ -63,6 +64,8 @@ function Room({ vault }: { vault: VaultState }) {
   const [ceremony, setCeremony] = useState<{ round: number; gifts: number } | null>(null);
   const [raid, setRaid] = useState(false);
   const [checkError, setCheckError] = useState("");
+  const [step, setStep] = useState<string | null>(null);
+  const [stepError, setStepError] = useState("");
   const busy = useRef(false);
 
   const giftCount =
@@ -215,6 +218,17 @@ function Room({ vault }: { vault: VaultState }) {
     }
   };
 
+  const saveStep = () => {
+    let zat = 0n;
+    try {
+      zat = parseZec(step ?? "");
+    } catch {}
+    if (zat <= 0n) return setStepError("The payout step has to be a ZEC amount above zero, like 0.01.");
+    saveVault({ ...loadVault()!, unitZat: zat.toString() });
+    setStep(null);
+    setStepError("");
+  };
+
   const open = openRound(vault);
   const closing = vault.rounds.filter((r) => r.status === "closing");
   const giveLink = `${siteOrigin()}/#/give/${vault.group.npub}`;
@@ -265,8 +279,50 @@ function Room({ vault }: { vault: VaultState }) {
             <div>
               <dt>Payout step</dt>
               <dd className="num">{zecText(BigInt(vault.unitZat))}</dd>
+              {step === null && (
+                <dd>
+                  <button className="linkish small" onClick={() => setStep(zecText(BigInt(vault.unitZat), 8).replace(/ ZEC$/, ""))}>
+                    Change
+                  </button>
+                </dd>
+              )}
             </div>
           </dl>
+          <AnimatePresence initial={false}>
+            {step !== null && (
+              <motion.form
+                className="field vault-step"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                style={{ overflow: "hidden" }}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  saveStep();
+                }}
+              >
+                <label htmlFor="vault-step">New payout step, in ZEC</label>
+                <div className="vault-step-row">
+                  <input
+                    id="vault-step"
+                    className="input num"
+                    value={step}
+                    onChange={(e) => setStep(e.target.value)}
+                    inputMode="decimal"
+                    autoFocus
+                  />
+                  <button className="btn small" disabled={checking}>
+                    Save
+                  </button>
+                  <button type="button" className="btn ghost small" onClick={() => (setStep(null), setStepError(""))}>
+                    Cancel
+                  </button>
+                </div>
+                <small>Applies to the next payout. Smaller steps reach your wallet sooner; bigger ones hide more.</small>
+                {stepError && <span className="err-inline small">{stepError}</span>}
+              </motion.form>
+            )}
+          </AnimatePresence>
           <div className="vault-status-row">
             <span className={`dot ${checking ? "gold" : "live"}`} />
             <span className="small">
@@ -302,9 +358,9 @@ function Room({ vault }: { vault: VaultState }) {
         )}
 
         {closing.map((r) => {
-          const waiting = r.donations.filter((d) => d.status === "awaiting" || d.status === "swapping");
+          const swapping = r.donations.filter((d) => d.status === "swapping");
+          const unpaid = r.donations.filter((d) => d.status === "awaiting");
           const toCollect = r.donations.filter((d) => d.status === "arrived");
-          const lastDeadline = waiting.map((d) => (d.deadline ? Date.parse(d.deadline) : 0)).reduce((a, b) => Math.max(a, b), 0);
           const ready = settled(r);
           return (
             <RoundPanel
@@ -321,12 +377,16 @@ function Room({ vault }: { vault: VaultState }) {
               }
               hint={
                 ready
-                  ? "Every gift for this round has landed or lapsed. Pay it out, and its keys are deleted for good."
+                  ? `Every paid gift has landed. Pay it out, and its keys are deleted for good.${
+                      unpaid.length && open
+                        ? ` The ${unpaid.length === 1 ? "gift" : `${unpaid.length} gifts`} nobody has paid for yet ${
+                            unpaid.length === 1 ? "moves" : "move"
+                          } to round ${open.index}, so a late payment still arrives.`
+                        : ""
+                    }`
                   : toCollect.length
                     ? `Collect the ${toCollect.length} arrived ${toCollect.length === 1 ? "gift" : "gifts"} first.`
-                    : `Waiting on ${waiting.length} ${waiting.length === 1 ? "gift" : "gifts"} still in flight${
-                        lastDeadline ? `, until ${new Date(lastDeadline).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} at the latest` : ""
-                      }. Burning now would lose them.`
+                    : `Waiting on ${swapping.length} ${swapping.length === 1 ? "gift" : "gifts"} still being swapped. This usually takes a few minutes. Burning now would lose ${swapping.length === 1 ? "it" : "them"}.`
               }
             />
           );
@@ -532,6 +592,7 @@ function PlanSheet({
 }) {
   const next = openRound(vault);
   const gifts = plan.round.donations.filter((d) => d.status === "swept").length;
+  const unpaid = plan.round.donations.filter((d) => d.status === "awaiting").length;
   return (
     <motion.div className="sheet-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onCancel}>
       <motion.div
@@ -568,6 +629,8 @@ function PlanSheet({
         <p className="plan-warn small">
           Then round {plan.round.index}'s key and its {gifts} gift {gifts === 1 ? "key" : "keys"} are deleted from this browser. This
           can't be undone, and that's the point.
+          {unpaid > 0 &&
+            ` ${unpaid === 1 ? "The gift" : `The ${unpaid} gifts`} nobody has paid for yet ${unpaid === 1 ? "moves" : "move"} to round ${next?.index} instead.`}
         </p>
         <div className="sheet-actions">
           <button className="btn ghost" onClick={onCancel}>
