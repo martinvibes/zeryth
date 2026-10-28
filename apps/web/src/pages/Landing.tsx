@@ -33,7 +33,10 @@ export function Landing() {
 function webglOk(): boolean {
   try {
     const c = document.createElement("canvas");
-    return !!(c.getContext("webgl2") || c.getContext("webgl"));
+    const ctx = c.getContext("webgl2") || c.getContext("webgl");
+    // Hand the probe's context straight back: browsers cap how many a page may hold.
+    ctx?.getExtension("WEBGL_lose_context")?.loseContext();
+    return !!ctx;
   } catch {
     return false;
   }
@@ -42,7 +45,8 @@ function webglOk(): boolean {
 function Hero() {
   const section = useRef<HTMLElement>(null);
   const thaw: Thaw = useRef({ intro: 0, scroll: 0 });
-  const [gl] = useState(webglOk);
+  // Until the 3D block has drawn, and whenever WebGL is missing or lost, a photo of it stands in.
+  const [gl, setGl] = useState<"off" | "loading" | "live">(() => (webglOk() ? "loading" : "off"));
   const [thawed, setThawed] = useState(false);
   const [live, setLive] = useState<number | null>(null);
 
@@ -78,9 +82,10 @@ function Hero() {
   return (
     <section ref={section} className="hero">
       <div className="hero-sky" aria-hidden="true" />
-      {gl && (
+      <img className={`ice-still ${gl === "live" ? "is-covered" : ""}`} src="hero/ice.jpg" alt="" aria-hidden="true" />
+      {gl !== "off" && (
         <Suspense fallback={null}>
-          <IceVault thaw={thaw} />
+          <IceVault thaw={thaw} live={gl === "live"} onReady={() => setGl("live")} onLost={() => setGl("off")} />
         </Suspense>
       )}
       <Snowfall />
@@ -142,12 +147,12 @@ function Story() {
       gsap.fromTo(
         ".slip",
         { y: 80, rotate: 7 },
-        { y: -60, rotate: -4, ease: "none", scrollTrigger: { trigger: ref.current, start: "top bottom", end: "bottom top", scrub: true } },
+        { y: -60, rotate: -4, ease: "none", scrollTrigger: { trigger: ref.current, start: "top bottom", end: "bottom top", scrub: 0.4 } },
       );
       gsap.fromTo(
         ".slip-frost",
         { opacity: 0 },
-        { opacity: 1, ease: "none", scrollTrigger: { trigger: ".slip", start: "top 80%", end: "top 30%", scrub: true } },
+        { opacity: 1, ease: "none", scrollTrigger: { trigger: ".slip", start: "top 80%", end: "top 30%", scrub: 0.4 } },
       );
       gsap.from(".story-turn > *", {
         y: 30,

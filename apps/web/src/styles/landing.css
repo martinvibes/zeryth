@@ -22,6 +22,35 @@
   position: absolute;
   inset: 0;
   z-index: -1;
+  opacity: 0;
+  transition: opacity 0.9s ease;
+}
+.ice-canvas.is-live {
+  opacity: 1;
+}
+/* A photo of the block, where the 3D one sits, for when WebGL can't run. */
+.ice-still {
+  position: absolute;
+  z-index: -1;
+  left: 78%;
+  top: 53%;
+  width: 72svh;
+  height: 72svh;
+  translate: -50% -50%;
+  pointer-events: none;
+  -webkit-mask-image: radial-gradient(closest-side, #000 72%, transparent 100%);
+  mask-image: radial-gradient(closest-side, #000 72%, transparent 100%);
+  animation: ice-bob 6s ease-in-out infinite alternate;
+}
+.ice-still.is-covered {
+  visibility: hidden;
+  transition: visibility 0s 1s;
+  animation: none;
+}
+@keyframes ice-bob {
+  to {
+    transform: translateY(-1.4%) rotate(-1.2deg);
+  }
 }
 .snowfall {
   position: absolute;
@@ -150,6 +179,12 @@
   .hero-inner {
     padding-top: 6.5rem;
     padding-bottom: 48vh;
+  }
+  .ice-still {
+    left: 50%;
+    top: 70%;
+    width: min(76svh, 92vw);
+    height: min(76svh, 92vw);
   }
   .hero-sky {
     background:

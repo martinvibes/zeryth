@@ -24,7 +24,17 @@ if (typeof window !== "undefined") {
   );
 }
 
-export default function IceVault({ thaw }: { thaw: Thaw }) {
+export default function IceVault({
+  thaw,
+  live,
+  onReady,
+  onLost,
+}: {
+  thaw: Thaw;
+  live: boolean;
+  onReady: () => void;
+  onLost: () => void;
+}) {
   const host = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(true);
 
@@ -35,17 +45,28 @@ export default function IceVault({ thaw }: { thaw: Thaw }) {
   }, []);
 
   return (
-    <div ref={host} className="ice-canvas" aria-hidden="true">
+    <div ref={host} className={`ice-canvas ${live ? "is-live" : ""}`} aria-hidden="true">
       <Canvas
         frameloop={active ? "always" : "never"}
-        dpr={[1, 1.75]}
+        dpr={[1, 1.5]}
         gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}
         camera={{ position: [0, 0, 7], fov: 30 }}
+        onCreated={({ gl }) => gl.domElement.addEventListener("webglcontextlost", onLost, { once: true })}
       >
         <Scene thaw={thaw} />
+        <Drawn onReady={onReady} />
       </Canvas>
     </div>
   );
+}
+
+/** Tells the page once a few real frames are up, so the photo can step aside. */
+function Drawn({ onReady }: { onReady: () => void }) {
+  const frames = useRef(0);
+  useFrame(() => {
+    if (++frames.current === 4) onReady();
+  });
+  return null;
 }
 
 function useLayout() {
@@ -159,8 +180,8 @@ function Block({ thaw }: { thaw: Thaw }) {
       <RoundedBox args={[2.2, 2.2, 2.2]} radius={0.26} smoothness={6} renderOrder={2}>
         <MeshTransmissionMaterial
           ref={ice as never}
-          samples={light ? 3 : 6}
-          resolution={light ? 256 : 512}
+          samples={light ? 3 : 5}
+          resolution={light ? 256 : 384}
           thickness={1.4}
           roughness={0.26}
           ior={1.31}

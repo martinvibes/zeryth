@@ -15,6 +15,7 @@ export interface Token {
   decimals: number;
   price: number;
   contractAddress?: string;
+  coingeckoId?: string;
 }
 
 export interface QuoteDetails {

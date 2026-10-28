@@ -31,6 +31,7 @@ import { CopyField } from "../components/Copy";
 import { Snowfall } from "../components/Snowfall";
 import { ZecCoin } from "./landing/HowItWorks";
 import { Icon } from "../components/Icons";
+import { TokenLogo } from "../components/TokenLogo";
 import "../styles/give.css";
 
 type Fund =
@@ -458,7 +459,10 @@ function GiveForm({ pubkey, onReady }: { pubkey: string; onReady: (p: Pending) =
             onChange={(e) => setAmount(e.target.value.replace(",", "."))}
             aria-describedby="est"
           />
-          <span className="amount-unit">{token?.symbol ?? ""}</span>
+          <span className="amount-unit">
+            {token && <TokenLogo t={token} className="is-small" />}
+            {token?.symbol ?? ""}
+          </span>
         </div>
         <span id="est" className="estimate" aria-live="polite">
           {amountUsd > 0 && <span className="muted">{usd(amountUsd)}. </span>}
@@ -518,8 +522,11 @@ function GiveForm({ pubkey, onReady }: { pubkey: string; onReady: (p: Pending) =
 function TokenChip({ t, on, pick }: { t: Token; on: boolean; pick: () => void }) {
   return (
     <button type="button" role="radio" aria-checked={on} className={`token ${on ? "is-on" : ""}`} onClick={pick}>
-      <span className="token-sym">{t.symbol}</span>
-      <span className="token-chain">{chainName(t.blockchain)}</span>
+      <TokenLogo t={t} />
+      <span className="token-text">
+        <span className="token-sym">{t.symbol}</span>
+        <span className="token-chain">{chainName(t.blockchain)}</span>
+      </span>
       {on && <motion.span layoutId="token-ring" className="token-ring" transition={{ type: "spring", bounce: 0.25, duration: 0.45 }} />}
     </button>
   );
@@ -538,6 +545,7 @@ function AllTokens({ tokens, pick }: { tokens: Token[]; pick: (id: string) => vo
         {list.map((t) => (
           <li key={t.assetId}>
             <button type="button" onClick={() => pick(t.assetId)}>
+              <TokenLogo t={t} className="is-small" />
               <strong>{t.symbol}</strong> <span className="muted">on {chainName(t.blockchain)}</span>
             </button>
           </li>
@@ -657,8 +665,11 @@ function PayStage({ pending, onReset }: { pending: Pending; onReset: () => void 
         <>
           <p className="pay-ask">
             Send exactly
-            <span className="pay-amount num">
-              {pending.amountInFormatted} {token?.symbol ?? ""}
+            <span className="pay-amount-row">
+              {token && <TokenLogo t={token} className="is-large" />}
+              <span className="pay-amount num">
+                {pending.amountInFormatted} {token?.symbol ?? ""}
+              </span>
             </span>
             {token && <span className="pay-chain">on {chainName(token.blockchain)}</span>}
           </p>

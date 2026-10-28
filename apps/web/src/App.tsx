@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { href, useRoute, type Route } from "./router";
-import { scrollToTop, startSmoothScroll, ScrollTrigger } from "./lib/smooth";
+import { scrollToTop, ScrollTrigger } from "./lib/smooth";
 import { Nav } from "./components/Nav";
 import { Landing } from "./pages/Landing";
 
@@ -36,8 +36,6 @@ export function App() {
   // A claim card's key or a doc section changes the hash without being a new page.
   const key = route.page === "claim" || route.page === "doc" ? route.page : href(route);
 
-  useEffect(() => startSmoothScroll(), []);
-
   useEffect(() => {
     scrollToTop();
     // Pages mount after the exit animation; measure again once they have.
@@ -53,17 +51,16 @@ export function App() {
       <AnimatePresence mode="wait" initial={false}>
         <motion.main
           key={key}
-          initial={{ opacity: 0, filter: "blur(10px)", y: 14 }}
+          initial={{ opacity: 0, y: 8 }}
           animate={{
             opacity: 1,
-            filter: "blur(0px)",
             y: 0,
-            transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] },
-            // A leftover filter or transform would make `position: fixed` children
-            // fixed to this element instead of the screen.
-            transitionEnd: { filter: "none", transform: "none" },
+            transition: { duration: 0.35, ease: [0.22, 1, 0.36, 1] },
+            // A leftover transform would make `position: fixed` children fixed to this
+            // element instead of the screen.
+            transitionEnd: { transform: "none" },
           }}
-          exit={{ opacity: 0, filter: "blur(8px)", y: -8, transition: { duration: 0.28, ease: [0.4, 0, 1, 1] } }}
+          exit={{ opacity: 0, transition: { duration: 0.18, ease: [0.4, 0, 1, 1] } }}
           onAnimationComplete={() => ScrollTrigger.refresh()}
         >
           <Suspense fallback={<div className="page-loading" aria-busy="true" />}>
