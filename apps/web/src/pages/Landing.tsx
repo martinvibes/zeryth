@@ -49,6 +49,18 @@ function Hero() {
   const [gl, setGl] = useState<"off" | "loading" | "live">(() => (webglOk() ? "loading" : "off"));
   const [thawed, setThawed] = useState(false);
   const [live, setLive] = useState<number | null>(null);
+  const still = useRef<HTMLImageElement>(null);
+
+  // The photo turns toward the pointer the way the 3D block does.
+  useEffect(() => {
+    if (gl === "live" || reducedMotion()) return;
+    const move = (e: PointerEvent) => {
+      still.current?.style.setProperty("--px", ((e.clientX / innerWidth) * 2 - 1).toFixed(3));
+      still.current?.style.setProperty("--py", ((e.clientY / innerHeight) * 2 - 1).toFixed(3));
+    };
+    addEventListener("pointermove", move, { passive: true });
+    return () => removeEventListener("pointermove", move);
+  }, [gl]);
 
   useEffect(() => {
     let alive = true;
@@ -82,7 +94,9 @@ function Hero() {
   return (
     <section ref={section} className="hero">
       <div className="hero-sky" aria-hidden="true" />
-      <img className={`ice-still ${gl === "live" ? "is-covered" : ""}`} src="hero/ice.jpg" alt="" aria-hidden="true" />
+      <div className={`ice-still ${gl === "live" ? "is-covered" : ""}`} aria-hidden="true">
+        <img ref={still} src="hero/ice.jpg" alt="" />
+      </div>
       {gl !== "off" && (
         <Suspense fallback={null}>
           <IceVault thaw={thaw} live={gl === "live"} onReady={() => setGl("live")} onLost={() => setGl("off")} />

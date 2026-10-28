@@ -38,9 +38,17 @@
   height: 72svh;
   translate: -50% -50%;
   pointer-events: none;
+  perspective: 900px;
+  animation: ice-bob 6s ease-in-out infinite alternate;
+}
+.ice-still img {
+  display: block;
+  width: 100%;
+  height: 100%;
   -webkit-mask-image: radial-gradient(closest-side, #000 72%, transparent 100%);
   mask-image: radial-gradient(closest-side, #000 72%, transparent 100%);
-  animation: ice-bob 6s ease-in-out infinite alternate;
+  transform: rotateY(calc(var(--px, 0) * 16deg)) rotateX(calc(var(--py, 0) * 11deg));
+  transition: transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .ice-still.is-covered {
   visibility: hidden;
