@@ -16,7 +16,7 @@ import * as nip19 from "nostr-tools/nip19";
 import { hkdf } from "@noble/hashes/hkdf.js";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, hexToBytes, randomBytes, utf8ToBytes } from "@noble/hashes/utils.js";
-import { BOARD_TAG, DROP_KIND, MIN_RELAY_ACKS, NOTICE_D_TAG, NOTICE_KIND, RELAYS } from "./config";
+import { BOARD_TAG, DROP_KIND, LISTED_TAG, MIN_RELAY_ACKS, NOTICE_D_TAG, NOTICE_KIND, RELAYS } from "./config";
 
 let sharedPool: SimplePool | null = null;
 export function pool(): SimplePool {
@@ -47,6 +47,10 @@ export function newGroupIdentity(): GroupIdentity {
 export function groupIdentityFromSecret(secret: string): GroupIdentity {
   const pubkey = getPublicKey(hexToBytes(secret));
   return { secret, pubkey, npub: nip19.npubEncode(pubkey) };
+}
+
+export function npubFromPubkey(pubkey: string): string {
+  return nip19.npubEncode(pubkey);
 }
 
 export function pubkeyFromNpub(npubOrHex: string): string {
@@ -103,6 +107,8 @@ export interface RoundNotice {
   name: string;
   tagline: string;
   opened: number;
+  /** The fund asked to appear in the give page's list. */
+  listed?: boolean;
 }
 
 export interface SignedNotice extends RoundNotice {
@@ -116,7 +122,7 @@ export async function publishNotice(group: GroupIdentity, notice: RoundNotice, r
     {
       kind: NOTICE_KIND,
       created_at: Math.floor(Date.now() / 1000),
-      tags: [["d", NOTICE_D_TAG]],
+      tags: notice.listed ? [["d", NOTICE_D_TAG], ["t", LISTED_TAG]] : [["d", NOTICE_D_TAG]],
       content: JSON.stringify(notice),
     },
     hexToBytes(group.secret),
@@ -139,6 +145,32 @@ export async function fetchNotice(groupPubkey: string, relays = RELAYS): Promise
   const body = JSON.parse(newest.content) as RoundNotice;
   if (body.v !== 1 || !/^[0-9a-f]{64}$/.test(body.drop)) throw new Error("the round notice is malformed");
   return { ...body, pubkey: newest.pubkey, eventId: newest.id, createdAt: newest.created_at };
+}
+
+/**
+ * Every fund that chose to be listed, newest first. A fund that unlists re-signs its
+ * notice without the tag, which replaces the listed one on each relay.
+ */
+export async function fetchListedFunds(relays = RELAYS): Promise<SignedNotice[]> {
+  const events = await pool().querySync(relays, { kinds: [NOTICE_KIND], "#t": [LISTED_TAG], limit: 300 }, { maxWait: 5000 });
+  const newest = new Map<string, Event>();
+  for (const e of events) {
+    if (!e.tags.some((t) => t[0] === "d" && t[1] === NOTICE_D_TAG)) continue;
+    const seen = newest.get(e.pubkey);
+    if ((!seen || seen.created_at < e.created_at) && verifyEvent(e)) newest.set(e.pubkey, e);
+  }
+  const funds: SignedNotice[] = [];
+  for (const e of newest.values()) {
+    try {
+      const body = JSON.parse(e.content) as RoundNotice;
+      if (body.v === 1 && body.listed && /^[0-9a-f]{64}$/.test(body.drop) && body.name) {
+        funds.push({ ...body, pubkey: e.pubkey, eventId: e.id, createdAt: e.created_at });
+      }
+    } catch {
+      // Someone else's malformed event under the same tag.
+    }
+  }
+  return funds.sort((a, b) => b.createdAt - a.createdAt);
 }
 
 // ---------------------------------------------------------------------------

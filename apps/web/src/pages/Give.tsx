@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
+  fetchListedFunds,
   fetchNotice,
   followSwap,
+  npubFromPubkey,
   oneclick,
   pubkeyFromNpub,
   startDonation,
@@ -28,6 +30,7 @@ import { Qr } from "../components/Qr";
 import { CopyField } from "../components/Copy";
 import { Snowfall } from "../components/Snowfall";
 import { ZecCoin } from "./landing/HowItWorks";
+import { Icon } from "../components/Icons";
 import "../styles/give.css";
 
 type Fund =
@@ -117,33 +120,116 @@ function FundSkeleton() {
 
 function PickFund() {
   const vault = useVault();
+  const [funds, setFunds] = useState<SignedNotice[] | null>(null);
+  const [failed, setFailed] = useState(false);
   const [text, setText] = useState("");
   const [err, setErr] = useState("");
+
+  useEffect(() => {
+    let alive = true;
+    fetchListedFunds().then(
+      (f) => alive && setFunds(f),
+      () => {
+        if (!alive) return;
+        setFailed(true);
+        setFunds([]);
+      },
+    );
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const m = /(npub1[02-9ac-hj-np-z]+)/.exec(text.trim());
     if (!m) return setErr("Paste the fund's give link, or the npub inside it.");
     window.location.hash = `#/give/${m[1]}`;
   };
+
   return (
-    <form className="panel give-panel" onSubmit={submit}>
-      <h1 className="give-title">Which fund do you want to give to?</h1>
-      <p className="muted">Each fund has its own give link. Paste it here, or open it directly.</p>
-      <label className="field">
-        <span>Give link</span>
-        <input className="input" value={text} onChange={(e) => setText(e.target.value)} placeholder="https://…/#/give/npub1…" autoFocus />
-      </label>
-      {err && <p className="err">{err}</p>}
-      <button className="btn gold block">Open the fund</button>
-      {vault && (
-        <p className="small muted">
-          Testing your own fund?{" "}
-          <a className="linkish" href={`#/give/${vault.group.npub}`}>
-            Give to {vault.name}
-          </a>
+    <>
+      <div className="give-head">
+        <h1 className="give-title">Who do you want to help?</h1>
+        <p className="lead">
+          Pick a fund, then give from almost any wallet. It reaches them as private Zcash, and you get your own one-time address,
+          so any number of people can give at once.
         </p>
-      )}
-    </form>
+      </div>
+
+      <section className="pick" aria-busy={funds === null}>
+        <h2 className="pick-h">
+          <Icon name="list" />
+          Funds that chose to be listed
+        </h2>
+        {funds === null ? (
+          <ul className="fund-list">
+            {[0, 1].map((i) => (
+              <li key={i} className="fund-card is-loading">
+                <span className="skeleton" style={{ width: "35%", height: 14 }} />
+                <span className="skeleton" style={{ width: "70%", height: 28 }} />
+                <span className="skeleton" style={{ width: "55%", height: 14 }} />
+              </li>
+            ))}
+          </ul>
+        ) : funds.length === 0 ? (
+          <p className="pick-empty">
+            {failed
+              ? "Couldn't reach the public board to list funds. Check your connection, or paste a give link below."
+              : "No funds are listed right now. Most funds share their own give link instead: paste it below."}
+          </p>
+        ) : (
+          <ul className="fund-list">
+            {funds.map((f, i) => {
+              const npub = npubFromPubkey(f.pubkey);
+              return (
+                <motion.li
+                  key={f.pubkey}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.06, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                >
+                  <a className="fund-card" href={`#/give/${npub}`}>
+                    <span className="fund-live">
+                      <span className="dot live" />
+                      Round {f.round} open {ago(f.opened).replace(/ ago$/, "")}
+                      {vault?.group.pubkey === f.pubkey ? ", your fund" : ""}
+                    </span>
+                    <span className="fund-name">{f.name}</span>
+                    {f.tagline && <span className="fund-tagline">{f.tagline}</span>}
+                    <span className="fund-go">
+                      Give to {f.name}
+                    </span>
+                  </a>
+                </motion.li>
+              );
+            })}
+          </ul>
+        )}
+        <p className="pick-note small">
+          <Icon name="info" />
+          Funds list themselves. Zeryth doesn't check who runs them, so give to groups you trust.
+        </p>
+      </section>
+
+      <form className="panel give-panel pick-link" onSubmit={submit}>
+        <h2 className="give-h2">Have a give link?</h2>
+        <label className="field">
+          <span>Give link</span>
+          <input className="input" value={text} onChange={(e) => setText(e.target.value)} placeholder="https://…/#/give/npub1…" />
+        </label>
+        {err && <p className="err">{err}</p>}
+        <button className="btn gold block">Open the fund</button>
+        {vault && !vault.listed && (
+          <p className="small muted">
+            Testing your own fund?{" "}
+            <a className="linkish" href={`#/give/${vault.group.npub}`}>
+              Give to {vault.name}
+            </a>
+          </p>
+        )}
+      </form>
+    </>
   );
 }
 
@@ -379,8 +465,8 @@ function GiveForm({ pubkey, onReady }: { pubkey: string; onReady: (p: Pending) =
           {est.state === "busy" && <span className="muted">Pricing it…</span>}
           {est.state === "ok" && (
             <span>
-              The fund receives about <strong className="num">{est.zec} ZEC</strong>, in roughly {est.minutes}{" "}
-              {est.minutes === 1 ? "minute" : "minutes"}.
+              The fund receives about <strong className="num">{est.zec} ZEC</strong>, usually within{" "}
+              {Math.max(est.minutes * 3, 20)} minutes of your payment.
             </span>
           )}
           {est.state === "err" && <span className="err-inline">{est.msg}</span>}

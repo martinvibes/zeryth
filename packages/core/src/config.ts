@@ -34,6 +34,8 @@ export const BOARD_TAG = "zeryth";
 /** NIP-78 application data, replaceable per group: the current round's drop key. */
 export const NOTICE_KIND = 30078;
 export const NOTICE_D_TAG = "zeryth/round";
+/** On the notice of a fund that chose to appear in the give page's list. */
+export const LISTED_TAG = "zeryth-fund";
 
 /** One ZEC, in zatoshi. */
 export const COIN = 100_000_000n;

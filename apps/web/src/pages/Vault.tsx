@@ -2,12 +2,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   burn,
+  networkFee,
   openRound,
   parseZec,
   payout,
   planPayout,
   readBoard,
   rotate,
+  setListed,
   settled,
   sweepDonation,
   track,
@@ -19,12 +21,13 @@ import {
 import { getEngine } from "../engine/client";
 import { downloadBackup, loadVault, saveVault, useVault } from "../lib/store";
 import { siteOrigin } from "../router";
-import { ago, explorerTx, short, zecText } from "../lib/format";
+import { ago, explorerTx, short, span, zecText } from "../lib/format";
 import { chainName, formatUnitsPlain, givable, type Token } from "../lib/assets";
 import { Steps, sweepItems, type StepState } from "../components/Steps";
 import { CopyField } from "../components/Copy";
 import { Qr } from "../components/Qr";
-import { BurnCeremony } from "../components/BurnCeremony";
+import { BurnCeremony, type BurnSummary } from "../components/BurnCeremony";
+import { Icon, type IconName } from "../components/Icons";
 import { RaidReport } from "../components/RaidReport";
 import { CardBatches } from "./vault/CardBatches";
 import "../styles/vault.css";
@@ -61,11 +64,13 @@ function Room({ vault }: { vault: VaultState }) {
   const [balances, setBalances] = useState<Record<number, { zat: bigint; notes: number }>>({});
   const [task, setTask] = useState<Task | null>(null);
   const [plan, setPlan] = useState<{ round: Round; total: bigint; toVault: bigint; carried: bigint; fee: bigint } | null>(null);
-  const [ceremony, setCeremony] = useState<{ round: number; gifts: number } | null>(null);
+  const [ceremony, setCeremony] = useState<BurnSummary | null>(null);
   const [raid, setRaid] = useState(false);
   const [checkError, setCheckError] = useState("");
   const [step, setStep] = useState<string | null>(null);
   const [stepError, setStepError] = useState("");
+  const [listing, setListing] = useState(false);
+  const [listError, setListError] = useState("");
   const busy = useRef(false);
 
   const giftCount =
@@ -200,21 +205,48 @@ function Room({ vault }: { vault: VaultState }) {
 
   const payAndBurn = async (round: Round) => {
     setPlan(null);
-    const gifts = round.donations.filter((d) => d.status === "swept").length;
+    const done: { summary?: BurnSummary } = {};
     await runSweep(
       `Paying out round ${round.index}`,
       (onStage) =>
         mutate(async (s) => {
           const r = s.rounds.find((x) => x.index === round.index)!;
+          const moved = r.donations.filter((d) => d.status === "awaiting").length;
           const out = await payout(s, r, engine!, onStage);
+          // Counted after payout: unpaid quotes have moved on with their keys.
+          const gifts = r.donations.length;
           burn(s, r);
+          done.summary = {
+            round: r.index,
+            gifts,
+            moved,
+            toVaultZat: out?.toVaultZat ?? "0",
+            carriedZat: out?.carriedZat ?? "0",
+            txid: out?.txid || undefined,
+            next: openRound(s)?.index,
+          };
           return out?.txid || undefined;
         }),
       "Paid out.",
     );
-    if (!loadVault()?.rounds.some((r) => r.index === round.index)) {
+    if (done.summary && !loadVault()?.rounds.some((r) => r.index === round.index)) {
       setTask(null);
-      setCeremony({ round: round.index, gifts });
+      setCeremony(done.summary);
+    }
+  };
+
+  const toggleListed = async () => {
+    if (busy.current) return;
+    busy.current = true;
+    setListing(true);
+    setListError("");
+    try {
+      await mutate(async (s) => setListed(s, !s.listed));
+    } catch (e) {
+      setListError(`Couldn't update the list: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      busy.current = false;
+      setListing(false);
     }
   };
 
@@ -224,6 +256,7 @@ function Room({ vault }: { vault: VaultState }) {
       zat = parseZec(step ?? "");
     } catch {}
     if (zat <= 0n) return setStepError("The payout step has to be a ZEC amount above zero, like 0.01.");
+    if (busy.current) return setStepError("The vault room is busy for a moment. Try again in a few seconds.");
     saveVault({ ...loadVault()!, unitZat: zat.toString() });
     setStep(null);
     setStepError("");
@@ -232,6 +265,18 @@ function Room({ vault }: { vault: VaultState }) {
   const open = openRound(vault);
   const closing = vault.rounds.filter((r) => r.status === "closing");
   const giveLink = `${siteOrigin()}/#/give/${vault.group.npub}`;
+  const unit = BigInt(vault.unitZat);
+  const all = vault.rounds.flatMap((r) => r.donations);
+  const collected = all.filter((d) => d.status === "swept").length + vault.burned.reduce((n, b) => n + b.donations, 0);
+  const payouts = vault.burned.filter((b) => b.toVaultZat && b.toVaultZat !== "0").length;
+  const giftNote = [
+    collected && `${collected} collected`,
+    all.filter((d) => d.status === "arrived").length && `${all.filter((d) => d.status === "arrived").length} ready to collect`,
+    all.filter((d) => d.status === "swapping").length && `${all.filter((d) => d.status === "swapping").length} being swapped`,
+    all.filter((d) => d.status === "awaiting").length && `${all.filter((d) => d.status === "awaiting").length} waiting for the donor to pay`,
+  ]
+    .filter(Boolean)
+    .join(", ");
 
   return (
     <div className="vault">
@@ -264,28 +309,62 @@ function Room({ vault }: { vault: VaultState }) {
               </a>
             </div>
           </div>
+          <div className={`listing ${vault.listed ? "is-on" : ""}`}>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={!!vault.listed}
+              aria-label="List this fund on the Give page"
+              className="switch"
+              onClick={toggleListed}
+              disabled={listing || !open}
+            >
+              <motion.span className="switch-knob" layout transition={{ type: "spring", stiffness: 600, damping: 34 }} />
+            </button>
+            <div className="listing-text">
+              <p className="listing-title">
+                <Icon name="list" />
+                {listing ? "Updating the list…" : vault.listed ? "Listed on the Give page" : "Not listed on the Give page"}
+              </p>
+              <p className="small muted">
+                {vault.listed
+                  ? "Donors can find this fund without your link. So can anyone else who looks at the list."
+                  : "Only people with your link can find this fund. Listing it lets donors find you on the Give page, and anyone else too."}
+              </p>
+              {listError && <p className="err-inline small">{listError}</p>}
+            </div>
+          </div>
         </section>
 
         <section className="panel vault-status">
-          <dl className="vault-stats">
-            <div>
-              <dt>Gifts so far</dt>
-              <dd className="num">{giftCount}</dd>
+          <h2 className="vault-h2">At a glance</h2>
+          <dl className="glance">
+            <div className="glance-row">
+              <dt>Gifts</dt>
+              <dd className="glance-value num">{giftCount}</dd>
+              <dd className="glance-note">{giftNote || "None yet. Share your give link to get the first one."}</dd>
             </div>
-            <div>
+            <div className="glance-row">
               <dt>Paid to your wallet</dt>
-              <dd className="num">{zecText(paidZat)}</dd>
+              <dd className="glance-value num">{zecText(paidZat)}</dd>
+              <dd className="glance-note">
+                {payouts ? `In ${payouts === 1 ? "1 payout" : `${payouts} payouts`}` : "Nothing yet"}, to {short(vault.vaultAddress, 8, 6)}
+              </dd>
             </div>
-            <div>
+            <div className="glance-row">
               <dt>Payout step</dt>
-              <dd className="num">{zecText(BigInt(vault.unitZat))}</dd>
-              {step === null && (
-                <dd>
-                  <button className="linkish small" onClick={() => setStep(zecText(BigInt(vault.unitZat), 8).replace(/ ZEC$/, ""))}>
+              <dd className="glance-value num">
+                {zecText(unit)}
+                {step === null && (
+                  <button className="linkish small" onClick={() => setStep(zecText(unit, 8).replace(/ ZEC$/, ""))}>
                     Change
                   </button>
-                </dd>
-              )}
+                )}
+              </dd>
+              <dd className="glance-note">
+                Your wallet only ever receives whole steps of this. What's left waits for the next round, so no payout lines up
+                with a single gift.
+              </dd>
             </div>
           </dl>
           <AnimatePresence initial={false}>
@@ -346,6 +425,8 @@ function Room({ vault }: { vault: VaultState }) {
             round={open}
             tokens={tokens}
             balance={balances[open.index]}
+            unit={unit}
+            next={open.index + 1}
             onCollect={(d) => collect(open, d)}
             onCollectAll={() => collectAll(open)}
             action={
@@ -353,13 +434,11 @@ function Room({ vault }: { vault: VaultState }) {
                 Close round {open.index} and open round {open.index + 1}
               </button>
             }
-            hint="Closing a round gives it fresh keys and stops new gifts landing on the old ones. Gifts already on their way still arrive."
+            hint="Closing gives new gifts fresh keys. This round then pays out once the gifts already paid for have landed."
           />
         )}
 
         {closing.map((r) => {
-          const swapping = r.donations.filter((d) => d.status === "swapping");
-          const unpaid = r.donations.filter((d) => d.status === "awaiting");
           const toCollect = r.donations.filter((d) => d.status === "arrived");
           const ready = settled(r);
           return (
@@ -368,6 +447,8 @@ function Room({ vault }: { vault: VaultState }) {
               round={r}
               tokens={tokens}
               balance={balances[r.index]}
+              unit={unit}
+              next={open?.index}
               onCollect={(d) => collect(r, d)}
               onCollectAll={() => collectAll(r)}
               action={
@@ -377,16 +458,10 @@ function Room({ vault }: { vault: VaultState }) {
               }
               hint={
                 ready
-                  ? `Every paid gift has landed. Pay it out, and its keys are deleted for good.${
-                      unpaid.length && open
-                        ? ` The ${unpaid.length === 1 ? "gift" : `${unpaid.length} gifts`} nobody has paid for yet ${
-                            unpaid.length === 1 ? "moves" : "move"
-                          } to round ${open.index}, so a late payment still arrives.`
-                        : ""
-                    }`
+                  ? "Pays whole steps to your wallet, carries the rest into the open round, then deletes this round's keys for good."
                   : toCollect.length
-                    ? `Collect the ${toCollect.length} arrived ${toCollect.length === 1 ? "gift" : "gifts"} first.`
-                    : `Waiting on ${swapping.length} ${swapping.length === 1 ? "gift" : "gifts"} still being swapped. This usually takes a few minutes. Burning now would lose ${swapping.length === 1 ? "it" : "them"}.`
+                    ? "Collect the arrived gifts first. Burning now would lose them."
+                    : "Waiting for gifts still being swapped. Burning now would lose them."
               }
             />
           );
@@ -443,27 +518,107 @@ function Room({ vault }: { vault: VaultState }) {
         {plan && (
           <PlanSheet key="plan" plan={plan} vault={vault} onCancel={() => setPlan(null)} onConfirm={() => payAndBurn(plan.round)} />
         )}
-        {ceremony && <BurnCeremony key="burn" round={ceremony.round} gifts={ceremony.gifts} onDone={() => setCeremony(null)} />}
+        {ceremony && (
+          <BurnCeremony
+            key="burn"
+            summary={ceremony}
+            onDone={() => setCeremony(null)}
+            onRaid={() => {
+              setCeremony(null);
+              setRaid(true);
+            }}
+          />
+        )}
         {raid && <RaidReport key="raid" state={vault} onClose={() => setRaid(false)} />}
       </AnimatePresence>
     </div>
   );
 }
 
-const STATUS: Record<DonationRecord["status"], { label: string; tone: string }> = {
-  awaiting: { label: "Waiting for the donor to pay", tone: "wait" },
-  swapping: { label: "Swapping to Zcash", tone: "move" },
-  arrived: { label: "Arrived, ready to collect", tone: "ready" },
-  swept: { label: "Collected into the round", tone: "done" },
-  refunded: { label: "Refunded to the donor", tone: "off" },
-  expired: { label: "Expired unpaid", tone: "off" },
-  failed: { label: "Swap failed", tone: "off" },
+const GIFT: Record<DonationRecord["status"], { label: string; icon: IconName; tone: string; say: (d: DonationRecord) => string }> = {
+  awaiting: {
+    label: "Waiting for the donor",
+    icon: "clock",
+    tone: "wait",
+    say: (d) => {
+      const left = d.deadline ? Date.parse(d.deadline) / 1000 - Date.now() / 1000 : 0;
+      return left > 0 ? `Their quote stays open for ${span(left)} more.` : "Their quote has run out.";
+    },
+  },
+  swapping: { label: "Swapping to Zcash", icon: "swap", tone: "move", say: () => "Usually lands in 5 to 20 minutes." },
+  arrived: { label: "Ready to collect", icon: "spark", tone: "ready", say: () => "Arrived as private Zcash." },
+  swept: { label: "Collected", icon: "check", tone: "done", say: () => "In this round's key." },
+  refunded: { label: "Refunded", icon: "x", tone: "off", say: () => "NEAR Intents sent it back to the donor." },
+  expired: { label: "Never paid", icon: "x", tone: "off", say: () => "The quote lapsed." },
+  failed: { label: "Swap failed", icon: "warn", tone: "off", say: () => "NEAR Intents refunds the donor." },
 };
+
+const STAGES = ["Taking gifts", "Letting paid gifts land", "Ready to pay out", "Burned"];
+
+type Note = { tone: "warn" | "go" | "info" | "quiet"; icon: IconName; title: string; body: string };
+const TONE_ORDER = { warn: 0, go: 1, info: 2, quiet: 3 };
+
+const count = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+/** What a round needs from the group right now, most urgent first. */
+function roundNotes(round: Round, next: number | undefined): Note[] {
+  const now = Date.now() / 1000;
+  const by = (s: DonationRecord["status"]) => round.donations.filter((d) => d.status === s);
+  const arrived = by("arrived");
+  const swapping = by("swapping");
+  const awaiting = by("awaiting");
+  const swept = by("swept");
+  const age = now - round.openedAt;
+  const notes: Note[] = [];
+
+  if (arrived.length) {
+    notes.push({
+      tone: "go",
+      icon: "spark",
+      title: `${count(arrived.length, "gift")} ready to collect`,
+      body: "Collecting moves it into this round's key. Your browser builds the proof itself, so allow a minute or two and keep this tab open.",
+    });
+  }
+  // A gift mid-swap or waiting for its donor already says so in its own row. It only
+  // needs a note when the round is about to pay out without it.
+  if (awaiting.length && round.status === "closing" && next) {
+    notes.push({
+      tone: "info",
+      icon: "clock",
+      title: awaiting.length === 1 ? "1 gift is still waiting for its donor to pay" : `${awaiting.length} gifts are still waiting for their donors to pay`,
+      body: `Paying out won't lose ${awaiting.length === 1 ? "it" : "them"}: ${
+        awaiting.length === 1 ? "it moves" : "they move"
+      } to round ${next} with ${awaiting.length === 1 ? "its key" : "their keys"}, so a late payment still arrives.`,
+    });
+  }
+  if (swapping.length && round.status === "closing") {
+    notes.push({
+      tone: "info",
+      icon: "swap",
+      title: `Waiting for ${count(swapping.length, "gift")} to finish swapping`,
+      body: "This round can pay out once it lands, usually within 5 to 20 minutes. Burning before then would lose it.",
+    });
+  }
+  if (swept.length) {
+    const long = age > 3 * 86400;
+    notes.push({
+      tone: long ? "warn" : "quiet",
+      icon: long ? "warn" : "key",
+      title: long ? `This round has held donor keys for ${span(age)}` : "Until it burns, this round can trace its gifts",
+      body: `This browser holds ${count(swept.length, "gift key")} for round ${round.index}. Anyone who takes this device before the round burns could follow ${
+        swept.length === 1 ? "it" : "them"
+      } back to a donor's wallet. ${long ? "Close and pay out this round soon." : "Short rounds keep that window small."}`,
+    });
+  }
+  return notes.sort((a, b) => TONE_ORDER[a.tone] - TONE_ORDER[b.tone]);
+}
 
 function RoundPanel({
   round,
   tokens,
   balance,
+  unit,
+  next,
   onCollect,
   onCollectAll,
   action,
@@ -472,6 +627,8 @@ function RoundPanel({
   round: Round;
   tokens: Token[];
   balance?: { zat: bigint; notes: number };
+  unit: bigint;
+  next?: number;
   onCollect: (d: DonationRecord) => void;
   onCollectAll: () => void;
   action: React.ReactNode;
@@ -479,54 +636,111 @@ function RoundPanel({
 }) {
   const arrived = round.donations.filter((d) => d.status === "arrived");
   const gifts = [...round.donations].reverse();
+  const isOpen = round.status === "open";
+  const stage = isOpen ? 0 : settled(round) ? 2 : 1;
+  const notes = roundNotes(round, next);
+  const age = Date.now() / 1000 - round.openedAt;
+
   return (
     <motion.section layout className={`panel round round-${round.status}`}>
       <header className="round-head">
-        <div>
-          <p className="small muted">
-            {round.status === "open" ? `Open since ${ago(round.openedAt)}` : `Closing since ${ago(round.closedAt ?? round.openedAt)}`}
+        <div className="round-title">
+          <p className="round-kicker">
+            <span className={`dot ${isOpen ? "live" : "gold"}`} />
+            {isOpen ? `Open for ${span(age)}` : `Closed ${ago(round.closedAt ?? round.openedAt)}`}
           </p>
           <h2 className="vault-h2">Round {round.index}</h2>
         </div>
         <div className="round-balance">
           <span className="small muted">In the round now</span>
-          <span className="round-balance-value num">{balance ? zecText(balance.zat) : "…"}</span>
+          {balance ? (
+            <span className="round-balance-value num">{zecText(balance.zat)}</span>
+          ) : (
+            <span className="skeleton round-balance-wait" aria-label="Checking the balance" />
+          )}
         </div>
       </header>
 
+      <ol className="track" aria-label={`Round ${round.index} is at: ${STAGES[stage]}`}>
+        {STAGES.map((label, i) => (
+          <li key={label} className={i < stage ? "is-done" : i === stage ? "is-now" : ""}>
+            <span className="track-dot">
+              {i < stage ? <Icon name="check" /> : i === stage ? <motion.span layoutId={`track-${round.index}`} className="track-now" /> : null}
+            </span>
+            <span className="track-label">{label}</span>
+          </li>
+        ))}
+      </ol>
+
+      {balance && balance.zat > 0n && <StepMeter zat={balance.zat} notes={balance.notes} unit={unit} closing={!isOpen} />}
+
+      {notes.length > 0 && (
+        <div className="callouts">
+          <AnimatePresence initial={false}>
+            {notes.map((n) => (
+              <motion.div
+                key={n.title}
+                layout
+                className={`callout callout-${n.tone}`}
+                role={n.tone === "warn" ? "alert" : undefined}
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+              >
+                <span className="callout-icon">
+                  <Icon name={n.icon} />
+                </span>
+                <div>
+                  <p className="callout-title">{n.title}</p>
+                  <p className="callout-body">{n.body}</p>
+                </div>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
+      )}
+
       {gifts.length === 0 ? (
-        <p className="round-empty muted">
-          No gifts yet. When someone gives, their sealed note shows up here within a minute or two.
-        </p>
+        <div className="round-empty">
+          <Icon name="clock" />
+          <p>No gifts yet. When someone gives, their sealed note shows up here within a minute or two.</p>
+        </div>
       ) : (
         <ul className="gifts">
           <AnimatePresence initial={false}>
-            {gifts.map((d) => (
-              <motion.li
-                key={d.dropId}
-                layout
-                initial={{ opacity: 0, y: -8, backgroundColor: "rgba(246,182,55,0.25)" }}
-                animate={{ opacity: 1, y: 0, backgroundColor: "rgba(246,182,55,0)" }}
-                transition={{ duration: 0.8 }}
-                className="gift"
-              >
-                <span className={`pill pill-${STATUS[d.status].tone}`}>{STATUS[d.status].label}</span>
-                <span className="gift-what">
-                  {giftAmount(d, tokens)}
-                  <span className="small muted"> {ago(d.seenAt)}</span>
-                </span>
-                {d.status === "arrived" && (
-                  <button className="btn small gold" onClick={() => onCollect(d)}>
-                    Collect
-                  </button>
-                )}
-                {d.status === "swept" && d.sweepTxid && (
-                  <a className="linkish small" href={explorerTx(d.sweepTxid)} target="_blank" rel="noreferrer">
-                    Transaction
-                  </a>
-                )}
-              </motion.li>
-            ))}
+            {gifts.map((d) => {
+              const g = GIFT[d.status];
+              return (
+                <motion.li
+                  key={d.dropId}
+                  layout
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                  className={`gift tone-${g.tone}`}
+                >
+                  <span className="gift-icon">
+                    <Icon name={g.icon} />
+                  </span>
+                  <span className="gift-main">
+                    <span className="gift-what">{giftAmount(d, tokens)}</span>
+                    <span className="gift-sub">
+                      <strong>{g.label}.</strong> {g.say(d)} Started {ago(d.seenAt)}.
+                    </span>
+                  </span>
+                  {d.status === "arrived" && (
+                    <button className="btn small gold" onClick={() => onCollect(d)}>
+                      Collect
+                    </button>
+                  )}
+                  {d.status === "swept" && d.sweepTxid && (
+                    <a className="linkish small" href={explorerTx(d.sweepTxid)} target="_blank" rel="noreferrer">
+                      Transaction
+                    </a>
+                  )}
+                </motion.li>
+              );
+            })}
           </AnimatePresence>
         </ul>
       )}
@@ -543,6 +757,59 @@ function RoundPanel({
         </div>
       </footer>
     </motion.section>
+  );
+}
+
+/**
+ * How close the round is to paying the group's wallet: whole payout steps fill in gold,
+ * the next step fills as gifts come in.
+ */
+function StepMeter({ zat, notes, unit, closing }: { zat: bigint; notes: number; unit: bigint; closing: boolean }) {
+  const spends = Math.max(notes, 1);
+  const fee = networkFee(spends, 2);
+  const avail = zat > fee ? zat - fee : 0n;
+  const plan = planPayout(zat, spends, unit);
+  const whole = Number(plan.toVault / unit);
+  const part = Math.min(0.97, Number(((avail - plan.toVault) * 1000n) / unit) / 1000);
+  const slots = Math.min(Math.max(whole + 2, 3), 8);
+  const under = whole === 0;
+
+  return (
+    <div className={`meter ${under && closing ? "is-short" : ""}`}>
+      <div className="meter-head">
+        <span className="meter-title">
+          <Icon name={under && closing ? "warn" : "spark"} />
+          {under ? "Not enough for a payout yet" : `${count(whole, "payout step")} ready for your wallet`}
+        </span>
+        <span className="small muted">Step: {zecText(unit)}</span>
+      </div>
+      <div className="meter-track" aria-hidden="true">
+        {Array.from({ length: slots }, (_, i) => (
+          <span key={i} className="meter-slot">
+            <motion.span
+              className="meter-fill"
+              initial={{ scaleX: 0 }}
+              animate={{ scaleX: i < whole ? 1 : i === whole ? part : 0 }}
+              transition={{ duration: 0.9, delay: 0.1 + i * 0.08, ease: [0.22, 1, 0.36, 1] }}
+            />
+          </span>
+        ))}
+      </div>
+      <p className="meter-say small">
+        {under ? (
+          <>
+            <strong className="num">{zecText(unit - avail)}</strong> more and this round can pay{" "}
+            <strong className="num">{zecText(unit)}</strong> to your wallet. Paying out now carries everything into the next round.
+          </>
+        ) : (
+          <>
+            Paying out now sends <strong className="num">{zecText(plan.toVault)}</strong> to your wallet and carries{" "}
+            <strong className="num">{zecText(plan.carried)}</strong> into the next round, after a{" "}
+            <span className="num">{zecText(plan.fee, 5)}</span> network fee.
+          </>
+        )}
+      </p>
+    </div>
   );
 }
 

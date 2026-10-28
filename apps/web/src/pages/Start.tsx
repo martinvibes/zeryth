@@ -20,6 +20,7 @@ export function Start() {
   const [vaultAddress, setVaultAddress] = useState("");
   const [unit, setUnit] = useState("0.01");
   const [advanced, setAdvanced] = useState(false);
+  const [listed, setListed] = useState(false);
   const [phase, setPhase] = useState<Phase>({ at: "form" });
   const [error, setError] = useState("");
 
@@ -50,7 +51,7 @@ export function Start() {
     try {
       setPhase({ at: "making", step: 0 });
       const group = newGroupIdentity();
-      const state = newVault({ group, name: name.trim(), tagline: tagline.trim(), vaultAddress: vaultAddress.trim(), unitZat });
+      const state = newVault({ group, name: name.trim(), tagline: tagline.trim(), vaultAddress: vaultAddress.trim(), unitZat, listed });
       await pause();
       setPhase({ at: "making", step: 1 });
       await rotate(state, engine);
@@ -122,6 +123,17 @@ export function Start() {
                 with u1.
               </small>
               {addressProblem && <span className="err-inline small">{addressProblem}</span>}
+            </label>
+
+            <label className="check-row">
+              <input type="checkbox" checked={listed} onChange={(e) => setListed(e.target.checked)} />
+              <span>
+                <strong>List this fund on the Give page</strong>
+                <small>
+                  Donors can find you without your link. So can anyone else, so leave it off if being easy to find puts you at
+                  risk. You can change this later.
+                </small>
+              </span>
             </label>
 
             <button type="button" className="linkish small" onClick={() => setAdvanced((a) => !a)}>

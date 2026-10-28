@@ -94,6 +94,8 @@ export interface VaultState {
   /** The group's long-term wallet (Zodl, Zingo, …). Zeryth only ever pays into it. */
   vaultAddress: string;
   unitZat: string;
+  /** Shown in the give page's list of funds. Off unless the group turns it on. */
+  listed?: boolean;
   rounds: Round[];
   burned: BurnRecord[];
 }
@@ -106,6 +108,7 @@ export function newVault(args: {
   tagline: string;
   vaultAddress: string;
   unitZat?: bigint;
+  listed?: boolean;
 }): VaultState {
   return {
     v: 1,
@@ -114,6 +117,7 @@ export function newVault(args: {
     tagline: args.tagline,
     vaultAddress: args.vaultAddress,
     unitZat: (args.unitZat ?? DEFAULT_PAYOUT_UNIT_ZAT).toString(),
+    listed: args.listed ?? false,
     rounds: [],
     burned: [],
   };
@@ -151,6 +155,7 @@ export async function rotate(state: VaultState, engine: Engine): Promise<Round> 
     name: state.name,
     tagline: state.tagline,
     opened: round.openedAt,
+    listed: !!state.listed,
   });
   if (acks.length === 0) throw new Error("no relay accepted the round notice");
 
@@ -194,6 +199,23 @@ export async function readBoard(state: VaultState): Promise<DonationRecord[]> {
     }
   }
   return added;
+}
+
+/** Puts the fund in the give page's list, or takes it out, by re-signing the open round's notice. */
+export async function setListed(state: VaultState, listed: boolean): Promise<void> {
+  const round = openRound(state);
+  if (!round) throw new Error("open a round first");
+  const { acks } = await publishNotice(state.group, {
+    v: 1,
+    round: round.index,
+    drop: round.dropPubkey,
+    name: state.name,
+    tagline: state.tagline,
+    opened: round.openedAt,
+    listed,
+  });
+  if (acks.length === 0) throw new Error("no relay accepted the notice");
+  state.listed = listed;
 }
 
 /**

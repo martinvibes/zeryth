@@ -28,6 +28,17 @@ export function ago(unixSeconds: number): string {
   return d === 1 ? "yesterday" : `${d} days ago`;
 }
 
+/** A rough length of time for a sentence: "about 3 hours". */
+export function span(seconds: number): string {
+  const s = Math.max(0, seconds);
+  if (s < 90) return "about a minute";
+  const m = Math.round(s / 60);
+  if (m < 60) return `about ${m} minutes`;
+  const h = Math.round(s / 3600);
+  if (h < 36) return h === 1 ? "about an hour" : `about ${h} hours`;
+  return `about ${Math.round(s / 86400)} days`;
+}
+
 export function until(iso: string): string {
   const ms = Date.parse(iso) - Date.now();
   if (ms <= 0) return "expired";

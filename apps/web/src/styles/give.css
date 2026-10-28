@@ -426,3 +426,125 @@
 .claim .seg {
   justify-self: start;
 }
+
+/* Picking a fund */
+.pick {
+  display: grid;
+  gap: 0.8rem;
+}
+.pick-h {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: var(--t-small);
+  font-weight: 650;
+  color: var(--slate);
+}
+.pick-h .icon,
+.pick-note .icon {
+  width: 1rem;
+  height: 1rem;
+}
+.fund-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.7rem;
+}
+.fund-card {
+  display: grid;
+  gap: 0.35rem;
+  padding: 1.2rem 1.3rem;
+  border-radius: var(--r-card);
+  background: var(--panel-bg);
+  box-shadow: var(--panel-edge), var(--panel-shadow);
+  color: var(--ink);
+  text-decoration: none;
+  transition:
+    transform 0.35s var(--ease-out),
+    box-shadow 0.35s var(--ease-out);
+}
+a.fund-card:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    var(--panel-edge),
+    inset 0 0 0 2px rgba(246, 182, 55, 0.6),
+    var(--panel-shadow);
+}
+a.fund-card:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+.fund-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.8125rem;
+  color: var(--slate);
+}
+.fund-name {
+  font-size: clamp(1.35rem, 1.1rem + 1vw, 1.75rem);
+  font-weight: 760;
+  font-variation-settings: "wdth" 110;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.fund-tagline {
+  color: var(--ink-2);
+}
+.fund-go {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+  font-weight: 650;
+  color: var(--sun-deep);
+}
+.fund-go .icon {
+  width: 1rem;
+  height: 1rem;
+}
+.pick-empty {
+  padding: 1.2rem 1.3rem;
+  border-radius: var(--r-card);
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--slate);
+}
+.pick-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--slate);
+}
+.pick-link {
+  gap: 1rem;
+}
+
+.check-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: start;
+  padding: 0.9rem 1rem;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow: inset 0 0 0 1px var(--line);
+  cursor: pointer;
+}
+.check-row input {
+  width: 1.15rem;
+  height: 1.15rem;
+  margin-top: 0.15rem;
+  accent-color: var(--pine);
+}
+.check-row span {
+  display: grid;
+  gap: 0.2rem;
+}
+.check-row small {
+  color: var(--slate);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
